@@ -5,6 +5,7 @@
 
 extern crate alloc;
 
+use alloc::string::ToString;
 use panic_halt as _;
 use avr_device::atmega328p::{Peripherals, PORTB, TC1};
 use avr_device::atmega328p::portb;
@@ -15,7 +16,8 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use core::cell::RefCell;
 use support::serial::{BAUD_9600, SERIAL};
 use support::alloc::ALLOCATOR;
-use alloc::string::String;
+use alloc::collections::VecDeque;
+use alloc::vec;
 
 pub mod support;
 
@@ -57,8 +59,13 @@ fn main() -> ! {
 
   sei();
 
+  // Flush Transmission
   interrupt::free(|cs| {
-    SERIAL.borrow(cs).borrow_mut().write(cs, String::from("Test"));
+    SERIAL.borrow(cs).borrow_mut().write(cs, &mut VecDeque::from(vec![0, 0, 0, 0, 5]));
+  });
+
+  interrupt::free(|cs| {
+    SERIAL.borrow(cs).borrow_mut().write_text(cs, "Hello World!".to_string());
   });
 
   loop {}

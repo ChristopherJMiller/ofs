@@ -4,6 +4,8 @@ use avr_device::atmega328p::{USART0, PORTD};
 use avr_device::interrupt;
 use avr_device::interrupt::{CriticalSection, Mutex};
 use core::cell::RefCell;
+use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 use alloc::string::String;
 
 pub static BAUD_9600: u16 = 207;
@@ -11,7 +13,7 @@ pub static BAUD_9600: u16 = 207;
 pub struct Serial {
   usart0: Mutex<RefCell<Option<USART0>>>,
   ready: bool,
-  text_queue: String,
+  queue: Option<VecDeque<u8>>,
 }
 
 impl Serial {
@@ -19,6 +21,7 @@ impl Serial {
     portd.ddrd.write(|w| w.pd0().set_bit().pd1().set_bit());
     self.usart0.borrow(cs).replace(Some(usart0));
     self.ready = true;
+    self.queue = Some(VecDeque::new());
   }
 
   pub fn configure_uart(&self, cs: &CriticalSection, ubrrn: u16) {
@@ -37,17 +40,23 @@ impl Serial {
     }
   }
 
-  pub fn write(&mut self, cs: &CriticalSection, text: String) {
+  pub fn write_text(&mut self, cs: &CriticalSection, text: String) {
+    let chars = text.chars();
+    let reversed = chars.map(|c| c as u8).collect::<Vec<u8>>();
+    self.write(cs, &mut VecDeque::from(reversed));
+  }
+
+  pub fn write(&mut self, cs: &CriticalSection, data: &mut VecDeque<u8>) {
     if self.ready {
-      self.text_queue = text;
+      self.queue.as_mut().unwrap().append(data);
       self.write_to_udr(cs);
     }
   }
 
   pub fn write_to_udr(&mut self, cs: &CriticalSection) {
-    if let Some(c) = self.text_queue.pop() {
+    if let Some(c) = self.queue.as_mut().unwrap().pop_front() {
       let usart0 = self.usart0.borrow(cs).borrow();
-      usart0.as_ref().unwrap().udr0.write(|w| unsafe { w.bits(c as u8) });
+      usart0.as_ref().unwrap().udr0.write(|w| unsafe { w.bits(c) });
     }
   }
 }
@@ -62,5 +71,5 @@ fn USART_TX() {
 pub static SERIAL: Mutex<RefCell<Serial>> = Mutex::new(RefCell::new(Serial {
   usart0: Mutex::new(RefCell::new(None)),
   ready: false,
-  text_queue: String::new(),
+  queue: None,
 }));
