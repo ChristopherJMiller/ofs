@@ -9,6 +9,11 @@ edition = "2018"
 [dependencies]
 panic-halt = "0.2.0"
 
+[dependencies.linked_list_allocator]
+default-features = false
+version = "0.8.11"
+features = ["const_mut_refs"]
+
 [dependencies.avr-device]
 version = "0.3.1"
 features = ["atmega328p", "rt"]

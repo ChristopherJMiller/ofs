@@ -29,7 +29,7 @@ const buildController = async (): Promise<number> => {
     ],
     env: {
       CARGO_BUILD_TARGET: target,
-      CARGO_UNSTABLE_BUILD_STD: 'core'
+      CARGO_UNSTABLE_BUILD_STD: 'core,alloc'
     }
   })
   

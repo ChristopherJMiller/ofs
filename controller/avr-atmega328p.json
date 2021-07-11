@@ -6,6 +6,7 @@
   "eh-frame-header": false,
   "exe-suffix": ".elf",
   "executables": true,
+  "is-builtin": true,
   "late-link-args": {
     "gcc": [
       "-lgcc"

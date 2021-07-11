@@ -2,4 +2,4 @@
 target = "avr-atmega328p.json"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]
