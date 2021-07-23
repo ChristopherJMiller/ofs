@@ -43,8 +43,13 @@ name = "ofs-usb-firmware"
 version = "0.1.0"
 dependencies = [
  "avr-device",
+ "ofs_support",
  "panic-halt",
 ]
+
+[[package]]
+name = "ofs_support"
+version = "0.1.0"
 
 [[package]]
 name = "panic-halt"

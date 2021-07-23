@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 panic-halt = "0.2.0"
+ofs_support = { path = "../ofs-support" }
 
 [dependencies.avr-device]
 version = "0.3.1"
