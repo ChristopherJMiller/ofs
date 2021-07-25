@@ -1,31 +1,42 @@
-
 use core::cell::RefCell;
 
-use avr_device::{asm::nop, atmega328p::PORTD, interrupt::{CriticalSection, Mutex}};
+use avr_device::asm::nop;
+use avr_device::atmega328p::PORTD;
+use avr_device::interrupt::{CriticalSection, Mutex};
 use ofs_support::fightstick::Fightstick;
 
 static G_PORTD: Mutex<RefCell<Option<PORTD>>> = Mutex::new(RefCell::new(None));
 
 pub fn setup_ports(cs: &CriticalSection, portd: PORTD) {
-  portd.ddrd.modify(|_, w| 
-    w
-      .pd2().set_bit()
-      .pd3().set_bit()
-      .pd4().clear_bit()
-      .pd5().clear_bit()
-      .pd6().clear_bit()
-      .pd7().clear_bit()
-  );
+  portd.ddrd.modify(|_, w| {
+    w.pd2()
+      .set_bit()
+      .pd3()
+      .set_bit()
+      .pd4()
+      .clear_bit()
+      .pd5()
+      .clear_bit()
+      .pd6()
+      .clear_bit()
+      .pd7()
+      .clear_bit()
+  });
 
-  portd.portd.modify(|_r, w|
-    w
-      .pd2().clear_bit()
-      .pd3().clear_bit()
-      .pd4().set_bit()
-      .pd5().set_bit()
-      .pd6().set_bit()
-      .pd7().set_bit()
-  );
+  portd.portd.modify(|_r, w| {
+    w.pd2()
+      .clear_bit()
+      .pd3()
+      .clear_bit()
+      .pd4()
+      .set_bit()
+      .pd5()
+      .set_bit()
+      .pd6()
+      .set_bit()
+      .pd7()
+      .set_bit()
+  });
 
   G_PORTD.borrow(cs).replace(Some(portd));
 }
@@ -95,7 +106,7 @@ pub fn build_fightstick_data(cs: &CriticalSection) -> Fightstick {
       button_1: u_b,
       button_9: d_a,
       button_3: d_b,
-      
+
       button_4: u_c,
       button_2: u_d,
       button_6: d_c,

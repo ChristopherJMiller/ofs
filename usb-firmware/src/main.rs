@@ -2,25 +2,27 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-use panic_halt as _;
-use avr_device::atmega8u2::{CPU, Peripherals, TC0, TC1, PORTD};
-use avr_device::entry;
-use avr_device::asm::wdr;
-use avr_device::interrupt;
-use avr_device::interrupt::{free, enable, Mutex, CriticalSection};
 use core::cell::RefCell;
-use usb::{send_gamepad_data, setup_usb};
-use usart::{ask_for_fighstick_data, handshake_controller, introduction_complete, setup_usart};
 
-pub mod usb;
-pub mod usart;
+use avr_device::asm::wdr;
+use avr_device::atmega8u2::{Peripherals, CPU, TC0, TC1};
+use avr_device::interrupt::{enable, free, CriticalSection, Mutex};
+use avr_device::{entry, interrupt};
+use panic_halt as _;
+use usart::{ask_for_fighstick_data, handshake_controller, setup_usart};
+use usb::{send_gamepad_data, setup_usb};
+
 pub mod descriptors;
+pub mod usart;
+pub mod usb;
 
 static G_TC0: Mutex<RefCell<Option<TC0>>> = Mutex::new(RefCell::new(None));
 static G_TC1: Mutex<RefCell<Option<TC1>>> = Mutex::new(RefCell::new(None));
 
 fn sei() {
-  unsafe { enable(); }
+  unsafe {
+    enable();
+  }
 }
 
 fn setup_cpu(_: &CriticalSection, cpu: CPU) {
@@ -79,7 +81,7 @@ fn TIMER1_COMPA() {
 fn TIMER0_COMPA() {
   interrupt::free(|cs| {
     let tc0 = G_TC0.borrow(cs).borrow();
-    
+
     tc0.as_ref().unwrap().tccr0b.write(|w| w.cs0().no_clock());
 
     ask_for_fighstick_data(cs);

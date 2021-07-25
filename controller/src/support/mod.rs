@@ -1,3 +1,2 @@
-
-pub mod serial;
 pub mod alloc;
+pub mod serial;

@@ -1,10 +1,12 @@
-
-use avr_device::atmega8u2::{PLL, USB_DEVICE, PORTD};
-use avr_device::interrupt::{free, Mutex, CriticalSection};
 use core::cell::{Ref, RefCell};
-use avr_device::interrupt;
 
-use crate::descriptors::{DESCRIPTOR_LIST, ENDPOINT0_SIZE, ENDPOINT_TABLE, GAMEPAD_ENDPOINT, GAMEPAD_INTERFACE, INIT_BYTES};
+use avr_device::atmega8u2::{PLL, PORTD, USB_DEVICE};
+use avr_device::interrupt;
+use avr_device::interrupt::{free, CriticalSection, Mutex};
+
+use crate::descriptors::{
+  DESCRIPTOR_LIST, ENDPOINT0_SIZE, ENDPOINT_TABLE, GAMEPAD_ENDPOINT, GAMEPAD_INTERFACE, INIT_BYTES,
+};
 use crate::usart::get_fightstick_data;
 
 pub static PORTD: Mutex<RefCell<Option<PORTD>>> = Mutex::new(RefCell::new(None));
@@ -52,10 +54,7 @@ impl RequestType {
 }
 
 pub fn setup_usb(cs: &CriticalSection, usb: USB_DEVICE, pll: PLL, portd: PORTD) {
-  usb.usbcon.write(|w| w
-    .frzclk().set_bit()
-    .usbe().set_bit()
-  );
+  usb.usbcon.write(|w| w.frzclk().set_bit().usbe().set_bit());
 
   pll.pllcsr.write(|w| unsafe { w.bits(1 << 2).plle().set_bit() });
 
@@ -64,7 +63,7 @@ pub fn setup_usb(cs: &CriticalSection, usb: USB_DEVICE, pll: PLL, portd: PORTD) 
   usb.usbcon.write(|w| w.usbe().set_bit());
   usb.udcon.write(|w| unsafe { w.bits(0) });
   usb.udien.write(|w| w.eorste().set_bit().sofe().set_bit());
-  
+
   portd.ddrd.write(|w| w.pd5().set_bit().pd4().set_bit());
   portd.portd.write(|w| w.pd5().set_bit().pd4().set_bit());
 
@@ -84,21 +83,23 @@ fn USB_GEN() {
       usb.as_ref().unwrap().uenum.write(|w| unsafe { w.bits(0) });
       usb.as_ref().unwrap().ueconx.write(|w| unsafe { w.bits(1) });
       usb.as_ref().unwrap().uecfg0x.write(|w| w.eptype().bits(0));
-      usb.as_ref().unwrap().uecfg1x.write(|w| w
-        .epsize().bits(0x3) // 64 Bytes
-        .alloc().set_bit()
-      );
+      usb.as_ref().unwrap().uecfg1x.write(|w| {
+        w.epsize()
+                    .bits(0x3) // 64 Bytes
+                    .alloc()
+                    .set_bit()
+      });
       usb.as_ref().unwrap().ueienx.write(|w| w.rxstpe().set_bit());
       *USB_CONFIGURED.borrow(cs).borrow_mut() = 0;
     }
   });
 }
 
-fn usb_send_in(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+fn usb_send_in(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   usb.as_ref().unwrap().ueintx.modify(|_, w| w.txini().clear_bit());
 }
 
-fn usb_wait_in_ready(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+fn usb_wait_in_ready(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   loop {
     let txini = usb.as_ref().unwrap().ueintx.read().txini().bit();
     if txini {
@@ -127,7 +128,11 @@ fn usb_wait_receive_out(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
 }
 
 fn usb_ack_out(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
-  usb.as_ref().unwrap().ueintx.write(|w| unsafe { w.bits(u8::max_value()).rxouti().clear_bit() });
+  usb
+    .as_ref()
+    .unwrap()
+    .ueintx
+    .write(|w| unsafe { w.bits(u8::max_value()).rxouti().clear_bit() });
 }
 
 pub fn send_gamepad_data(cs: &CriticalSection) {
@@ -139,31 +144,37 @@ pub fn send_gamepad_data(cs: &CriticalSection) {
   }
 
   if let Some(usb) = usb.as_ref() {
-    PORTD.borrow(cs).borrow().as_ref().unwrap().portd.modify(|r, w| w.pd5().bit(!r.pd5().bit()));
+    PORTD
+      .borrow(cs)
+      .borrow()
+      .as_ref()
+      .unwrap()
+      .portd
+      .modify(|r, w| w.pd5().bit(!r.pd5().bit()));
 
     usb.uenum.write(|w| unsafe { w.bits(GAMEPAD_ENDPOINT) });
     let timeout: u16 = usb.udfnum.read().bits() + 50;
-  
+
     loop {
       let rwal = usb.ueintx.read().rwal().bit();
       if rwal {
         break;
       }
-  
+
       if *config == 0 {
         return;
       }
-  
+
       let udfnum = usb.udfnum.read().bits();
       if udfnum >= timeout {
         return;
       }
     }
-  
+
     for data in get_fightstick_data(cs).0.iter() {
       usb.uedatx.write(|w| unsafe { w.bits(*data) });
     }
-    
+
     usb.ueintx.write(|w| unsafe { w.bits(0x3A) });
   }
 }
@@ -190,7 +201,7 @@ fn get_descriptor(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value: u1
       if !(len > 0 || n == ENDPOINT0_SIZE) {
         break;
       }
-    } 
+    }
     return;
   }
   stall(cs, usb);
@@ -199,7 +210,11 @@ fn get_descriptor(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value: u1
 fn set_address(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value: u16) {
   usb_send_in(cs, usb);
   usb_wait_in_ready(cs, usb);
-  usb.as_ref().unwrap().udaddr.write(|w| w.uadd().bits(value as u8).adden().set_bit());
+  usb
+    .as_ref()
+    .unwrap()
+    .udaddr
+    .write(|w| w.uadd().bits(value as u8).adden().set_bit());
 }
 
 fn set_configuration(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value: u16) {
@@ -212,9 +227,17 @@ fn set_configuration(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value:
     usb.as_ref().unwrap().ueconx.write(|w| unsafe { w.bits(en) });
     table_index += 1;
     if en > 0 {
-      usb.as_ref().unwrap().uecfg0x.write(|w| unsafe { w.bits(ENDPOINT_TABLE[table_index]) });
+      usb
+        .as_ref()
+        .unwrap()
+        .uecfg0x
+        .write(|w| unsafe { w.bits(ENDPOINT_TABLE[table_index]) });
       table_index += 1;
-      usb.as_ref().unwrap().uecfg1x.write(|w| unsafe { w.bits(ENDPOINT_TABLE[table_index]) });
+      usb
+        .as_ref()
+        .unwrap()
+        .uecfg1x
+        .write(|w| unsafe { w.bits(ENDPOINT_TABLE[table_index]) });
       table_index += 1;
     }
   }
@@ -222,8 +245,12 @@ fn set_configuration(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value:
   usb.as_ref().unwrap().uerst.write(|w| unsafe { w.bits(0) });
 }
 
-fn stall(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
-  usb.as_ref().unwrap().ueconx.write(|w| w.stallrq().set_bit().epen().set_bit());
+fn stall(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+  usb
+    .as_ref()
+    .unwrap()
+    .ueconx
+    .write(|w| w.stallrq().set_bit().epen().set_bit());
 }
 
 #[interrupt(atmega8u2)]
@@ -247,15 +274,23 @@ fn USB_COM() {
       let mut length = usb.as_ref().unwrap().uedatx.read().bits() as u16;
       length |= (usb.as_ref().unwrap().uedatx.read().bits() as u16) << 8;
 
-      usb.as_ref().unwrap().ueintx.write(|w| unsafe { 
-        w
-        .bits(u8::max_value()) 
-        .rxstpi().clear_bit()
-        .rxouti().clear_bit()
-        .txini().clear_bit()
+      usb.as_ref().unwrap().ueintx.write(|w| unsafe {
+        w.bits(u8::max_value())
+          .rxstpi()
+          .clear_bit()
+          .rxouti()
+          .clear_bit()
+          .txini()
+          .clear_bit()
       });
 
-      PORTD.borrow(cs).borrow().as_ref().unwrap().portd.modify(|r, w| w.pd4().bit(!r.pd4().bit()));
+      PORTD
+        .borrow(cs)
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .portd
+        .modify(|r, w| w.pd4().bit(!r.pd4().bit()));
 
       match RequestType::from_u8(request_type, request, index as u8) {
         RequestType::GetDescriptor => {
@@ -273,7 +308,7 @@ fn USB_COM() {
           if request_type == 0x80 {
             usb_wait_in_ready(cs, &usb);
             let config = USB_CONFIGURED.borrow(cs).borrow();
-            usb.as_ref().unwrap().uedatx.write(|w| unsafe { w.bits(*config)});
+            usb.as_ref().unwrap().uedatx.write(|w| unsafe { w.bits(*config) });
             usb_send_in(cs, &usb);
           } else {
             stall(cs, &usb)
@@ -319,7 +354,7 @@ fn USB_COM() {
           usb_send_in(cs, &usb);
         },
         RequestType::Stall => stall(cs, &usb),
-        _ => stall(cs, &usb)
+        _ => stall(cs, &usb),
       }
     }
   });

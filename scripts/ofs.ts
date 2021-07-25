@@ -33,6 +33,33 @@ const getMCU = (path: string): string => {
   return MCUs[path]
 }
 
+const fmtProject = async(path: string): Promise<number> => {
+  const projectDir = getProjectDir(path)
+  const cargoFile = getCargoFile(projectDir)
+  const fmt = Deno.run({
+    cmd: [
+      "cargo",
+      "+nightly",
+      "fmt",
+      `--manifest-path=${cargoFile}`
+    ],
+  })
+
+  const { code } = await fmt.status()
+
+  return code
+}
+
+const fmtProjects = async() => {
+  const tasks = [
+    fmtProject('controller'),
+    fmtProject('ofs-support'),
+    fmtProject('usb-firmware'),
+  ]
+
+  return Promise.all(tasks)
+}
+
 const buildController = async (path: string): Promise<number> => {
   const projectDir = getProjectDir(path)
   const cargoFile = getCargoFile(projectDir)
@@ -243,6 +270,7 @@ yargs(Deno.args)
   .command("genstr <string...>", "generate slice for string descriptor", (yargs: any) => yargs.positional('string', {
     describe: 'string to convert'
   }), (argv: Arguments) => generateSliceNameString(argv.string.join(' ')))
+  .command("fmt", "format projects", () => fmtProjects())
   .strictCommands()
   .demandCommand(1)
   .parse()

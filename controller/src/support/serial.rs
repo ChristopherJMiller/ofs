@@ -1,12 +1,12 @@
+use alloc::collections::VecDeque;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::cell::RefCell;
 
-use panic_halt as _;
-use avr_device::atmega328p::{USART0, PORTD};
+use avr_device::atmega328p::{PORTD, USART0};
 use avr_device::interrupt;
 use avr_device::interrupt::{CriticalSection, Mutex};
-use core::cell::RefCell;
-use alloc::collections::VecDeque;
-use alloc::vec::Vec;
-use alloc::string::String;
+use panic_halt as _;
 
 pub static BAUD_9600: u16 = 207;
 pub static BAUD_38400: u16 = 51;
@@ -31,19 +31,28 @@ impl Serial {
       let usart0 = self.usart0.borrow(cs).borrow();
       usart0.as_ref().unwrap().ucsr0a.write(|w| w.u2x0().set_bit()); // Double Baud
       usart0.as_ref().unwrap().ubrr0.write(|w| unsafe { w.bits(ubrrn) });
-      usart0.as_ref().unwrap().ucsr0c.write(|w| 
-        w
-        .umsel0().usart_async() // Async USART
-        .upm0().disabled() // No Parity
-        .usbs0().stop1() // 1 Stop Bit
-        .ucsz0().chr8() // 8 Character Bits
+      usart0.as_ref().unwrap().ucsr0c.write(
+        |w| {
+          w.umsel0()
+                        .usart_async() // Async USART
+                        .upm0()
+                        .disabled() // No Parity
+                        .usbs0()
+                        .stop1() // 1 Stop Bit
+                        .ucsz0()
+                        .chr8()
+        }, // 8 Character Bits
       );
-      usart0.as_ref().unwrap().ucsr0b.write(|w| 
-        w.txcie0().set_bit()
-        .rxcie0().set_bit()
-        .rxen0().set_bit()
-        .txen0().set_bit()
-      );
+      usart0.as_ref().unwrap().ucsr0b.write(|w| {
+        w.txcie0()
+          .set_bit()
+          .rxcie0()
+          .set_bit()
+          .rxen0()
+          .set_bit()
+          .txen0()
+          .set_bit()
+      });
     }
   }
 
@@ -55,7 +64,10 @@ impl Serial {
     self.capacity - self.queue.as_ref().unwrap().len()
   }
 
-  pub fn queue_many<F>(&mut self, cs: &CriticalSection, f: F) where F: Fn(&mut Self) -> () {
+  pub fn queue_many<F>(&mut self, cs: &CriticalSection, f: F)
+  where
+    F: Fn(&mut Self) -> (),
+  {
     f(self);
     self.write_to_udr(cs);
   }
@@ -64,7 +76,7 @@ impl Serial {
     if let Some(queue) = self.queue.as_mut() {
       if self.ready && queue.len() < self.capacity {
         queue.push_back(data);
-        return true
+        return true;
       }
     }
     false

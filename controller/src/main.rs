@@ -5,18 +5,18 @@
 
 extern crate alloc;
 
+use alloc::vec::Vec;
+use core::cell::RefCell;
+
+use avr_device::atmega328p::{portb, Peripherals, PORTB, TC1};
+use avr_device::interrupt::Mutex;
+use avr_device::{entry, interrupt};
 use fightstick::{build_fightstick_data, setup_ports};
 use ofs_support::fightstick::{FightstickDescriptor, IDLE_FIGHTSTICK};
 use ofs_support::usart::UsartCommand;
 use panic_halt as _;
-use avr_device::atmega328p::{Peripherals, PORTB, TC1};
-use avr_device::atmega328p::portb;
-use avr_device::{entry, interrupt};
-use avr_device::interrupt::Mutex;
-use core::cell::RefCell;
-use support::serial::{BAUD_9600, SERIAL};
 use support::alloc::ALLOCATOR;
-use alloc::vec::Vec;
+use support::serial::{BAUD_9600, SERIAL};
 
 pub mod fightstick;
 pub mod support;
@@ -32,7 +32,9 @@ fn configure_portb(portb: &portb::RegisterBlock) {
 }
 
 fn sei() {
-  unsafe { interrupt::enable(); }
+  unsafe {
+    interrupt::enable();
+  }
 }
 
 fn configure_timer(tc1: &TC1) {
@@ -54,7 +56,10 @@ fn main() -> ! {
     G_PORTB.borrow(cs).replace(Some(peripherals.PORTB));
 
     // Configure Serial Singleton (USART0)
-    SERIAL.borrow(cs).borrow_mut().setup(cs, peripherals.USART0, &peripherals.PORTD);
+    SERIAL
+      .borrow(cs)
+      .borrow_mut()
+      .setup(cs, peripherals.USART0, &peripherals.PORTD);
     SERIAL.borrow(cs).borrow().configure_uart(cs, BAUD_9600);
 
     setup_ports(cs, peripherals.PORTD);
@@ -70,7 +75,7 @@ fn main() -> ! {
     if let Ok(mut serial) = SERIAL.borrow(cs).try_borrow_mut() {
       serial.queue_many(cs, |serial| {
         for &i in [1, 2, 3, 4, 5, 6, 7, 8].iter() {
-          serial.write( i as u8);
+          serial.write(i as u8);
         }
       });
     }
@@ -120,8 +125,8 @@ fn USART_RX() {
             });
           }
         }
-      }
-      _ => {} // noop
+      },
+      _ => {}, // noop
     }
   });
 }

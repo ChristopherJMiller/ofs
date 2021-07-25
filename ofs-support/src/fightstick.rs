@@ -1,6 +1,5 @@
 use crate::usart::UsartCommand;
 
-
 pub struct FightstickDescriptor(pub [u8; 4]);
 
 impl FightstickDescriptor {
@@ -12,7 +11,6 @@ impl FightstickDescriptor {
       self.0[2],
       self.0[3],
     ]
-
   }
 }
 
@@ -78,7 +76,7 @@ impl Into<FightstickDescriptor> for Fightstick {
       self.get_descriptor_index(0).unwrap(),
       self.get_descriptor_index(1).unwrap(),
       self.get_descriptor_index(2).unwrap(),
-      self.get_descriptor_index(3).unwrap()
+      self.get_descriptor_index(3).unwrap(),
     ])
   }
 }
@@ -88,26 +86,20 @@ impl Fightstick {
     match index {
       0 => Some((self.x + 127) as u8),
       1 => Some((self.y + 127) as u8),
-      2 => {        
-        Some(
-          left_shift_bit(self.button_0, 0)
+      2 => Some(
+        left_shift_bit(self.button_0, 0)
           | left_shift_bit(self.button_1, 1)
           | left_shift_bit(self.button_2, 2)
           | left_shift_bit(self.button_3, 3)
           | left_shift_bit(self.button_4, 4)
           | left_shift_bit(self.button_5, 5)
           | left_shift_bit(self.button_6, 6)
-          | left_shift_bit(self.button_7, 7)
-        )
-      },
+          | left_shift_bit(self.button_7, 7),
+      ),
       3 => {
-        Some(
-          left_shift_bit(self.button_8, 0)
-          | left_shift_bit(self.button_9, 1)
-          | left_shift_bit(self.button_10, 2)
-        )
+        Some(left_shift_bit(self.button_8, 0) | left_shift_bit(self.button_9, 1) | left_shift_bit(self.button_10, 2))
       },
-      _ => None
+      _ => None,
     }
   }
 }

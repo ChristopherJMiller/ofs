@@ -1,4 +1,3 @@
-
 pub enum UsartCommand {
   Introduction,
   SendData,
