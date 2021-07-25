@@ -2,3 +2,4 @@
 /scripts/firmware
 /scripts/tmp/
 !/scripts/tmp/.keep
+ofs-support/target
