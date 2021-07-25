@@ -3,9 +3,9 @@ use avr_device::atmega8u2::{PLL, USB_DEVICE, PORTD};
 use avr_device::interrupt::{free, Mutex, CriticalSection};
 use core::cell::{Ref, RefCell};
 use avr_device::interrupt;
-use ofs_support::fightstick::Fightstick;
 
 use crate::descriptors::{DESCRIPTOR_LIST, ENDPOINT0_SIZE, ENDPOINT_TABLE, GAMEPAD_ENDPOINT, GAMEPAD_INTERFACE, INIT_BYTES};
+use crate::usart::get_fightstick_data;
 
 pub static PORTD: Mutex<RefCell<Option<PORTD>>> = Mutex::new(RefCell::new(None));
 pub static USB_DEVICE: Mutex<RefCell<Option<USB_DEVICE>>> = Mutex::new(RefCell::new(None));
@@ -107,7 +107,7 @@ fn usb_wait_in_ready(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   }
 }
 
-fn wait_for_host_ready(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+fn wait_for_host_ready(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   loop {
     let txini = usb.as_ref().unwrap().ueintx.read().txini().bit();
     let rxouti = usb.as_ref().unwrap().ueintx.read().rxouti().bit();
@@ -117,7 +117,7 @@ fn wait_for_host_ready(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   }
 }
 
-fn usb_wait_receive_out(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+fn usb_wait_receive_out(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   loop {
     let rxouti = usb.as_ref().unwrap().ueintx.read().rxouti().bit();
     if !rxouti {
@@ -126,7 +126,7 @@ fn usb_wait_receive_out(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   }
 }
 
-fn usb_ack_out(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
+fn usb_ack_out(_cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>) {
   usb.as_ref().unwrap().ueintx.write(|w| unsafe { w.bits(u8::max_value()).rxouti().clear_bit() });
 }
 
@@ -134,52 +134,38 @@ pub fn send_gamepad_data(cs: &CriticalSection) {
   let usb = USB_DEVICE.borrow(cs).borrow();
   let config = USB_CONFIGURED.borrow(cs).borrow();
 
-  PORTD.borrow(cs).borrow().as_ref().unwrap().portd.modify(|r, w| w.pd5().bit(!r.pd5().bit()));
-
   if *config == 0 {
     return;
   }
 
-  usb.as_ref().unwrap().uenum.write(|w| unsafe { w.bits(GAMEPAD_ENDPOINT) });
-  let timeout: u16 = usb.as_ref().unwrap().udfnum.read().bits() + 50;
+  if let Some(usb) = usb.as_ref() {
+    PORTD.borrow(cs).borrow().as_ref().unwrap().portd.modify(|r, w| w.pd5().bit(!r.pd5().bit()));
 
-  loop {
-    let rwal = usb.as_ref().unwrap().ueintx.read().rwal().bit();
-    if rwal {
-      break;
-    }
-
-    if *config == 0 {
-      return;
-    }
-
-    let udfnum = usb.as_ref().unwrap().udfnum.read().bits();
-    if udfnum >= timeout {
-      return;
-    }
-  }
-
-  let fightstick = Fightstick {
-    x: -100,
-    button_0: true,
-    button_1: true,
-    button_2: true,
-    button_3: false,
-    button_4: false,
-    button_5: true,
-    button_6: true,
-    button_7: true,
-    button_8: true,
-    button_9: false,
-    button_10: true,
-    ..Default::default()
-  };
-
-  for i in 0..=3 {
-    usb.as_ref().unwrap().uedatx.write(|w| unsafe { w.bits(fightstick.get_descriptor_index(i).unwrap()) });
-  }
+    usb.uenum.write(|w| unsafe { w.bits(GAMEPAD_ENDPOINT) });
+    let timeout: u16 = usb.udfnum.read().bits() + 50;
   
-  usb.as_ref().unwrap().ueintx.write(|w| unsafe { w.bits(0x3A) });
+    loop {
+      let rwal = usb.ueintx.read().rwal().bit();
+      if rwal {
+        break;
+      }
+  
+      if *config == 0 {
+        return;
+      }
+  
+      let udfnum = usb.udfnum.read().bits();
+      if udfnum >= timeout {
+        return;
+      }
+    }
+  
+    for data in get_fightstick_data(cs).0.iter() {
+      usb.uedatx.write(|w| unsafe { w.bits(*data) });
+    }
+    
+    usb.ueintx.write(|w| unsafe { w.bits(0x3A) });
+  }
 }
 
 fn get_descriptor(cs: &CriticalSection, usb: &Ref<Option<USB_DEVICE>>, value: u16, index: u16, length: u16) {
